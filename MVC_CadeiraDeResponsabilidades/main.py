@@ -3,8 +3,8 @@ from controller import Controller
 from model import Model
 
 v = View()
-c = Controller()
 m = Model()
+c = Controller(v,m)
 
 c.set_view(v)
 c.set_model(m)

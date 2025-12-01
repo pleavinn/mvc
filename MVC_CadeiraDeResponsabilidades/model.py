@@ -3,7 +3,21 @@ from typing import Dict, List, Optional
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
+from elo import Elo
+from elo_01 import Elo01_AvaliacaoIMC
+from elo_02 import Elo02_AvaliacaoCorrida
+from elo_03 import Elo03_AvaliacaoFlexibilidade
+from elo_04 import Elo04_AvaliacaoAbdominais
+from elo_05 import Elo05_Consolidacao
+from pymongo import MongoClient
 
+client = MongoClient(
+    "mongodb+srv://isabelly:isa12366@cluster0.m1jl3.mongodb.net/?retryWrites=true&w=majority"
+)
+
+db = client["mvc_banco"]
+collection = db["alunos"]
+db.my_collection.insert_one({"x": 10}).inserted_id
 
 # ======================================================================================
 # CLASSES DE DADOS
@@ -47,269 +61,6 @@ class Aluno:
     
     def __repr__(self):
         return f"Aluno({self.nome}, {self.idade} anos, {self.sexo})"
-
-
-# ======================================================================================
-# CADEIA DE RESPONSABILIDADE - CLASSE BASE
-# ======================================================================================
-
-class Elo(ABC):
-    """Classe abstrata base para os elos da cadeia de responsabilidade"""
-    
-    def __init__(self):
-        self._proximo_elo: Optional['Elo'] = None
-    
-    def definir_proximo(self, elo: 'Elo') -> 'Elo':
-        """Define o próximo elo na cadeia"""
-        self._proximo_elo = elo
-        return elo
-    
-    def processar(self, aluno: Aluno) -> Aluno:
-        """Processa o aluno e passa para o próximo elo"""
-        self._avaliar(aluno)
-        
-        if self._proximo_elo:
-            return self._proximo_elo.processar(aluno)
-        
-        return aluno
-    
-    @abstractmethod
-    def _avaliar(self, aluno: Aluno):
-        """Método abstrato que cada elo deve implementar"""
-        pass
-
-
-# ======================================================================================
-# ELO 01 - AVALIAÇÃO DE IMC
-# ======================================================================================
-
-class Elo01_AvaliacaoIMC(Elo):
-    """Avalia o IMC do aluno segundo os critérios do PROESP-Br"""
-    
-    # Tabelas de referência do PROESP-Br para IMC (simplificadas)
-    # Formato: {idade: {'M': (min_saudavel, max_saudavel), 'F': (min_saudavel, max_saudavel)}}
-    TABELA_IMC = {
-        6: {'M': (14.5, 17.5), 'F': (14.3, 17.2)},
-        7: {'M': (14.7, 17.9), 'F': (14.5, 17.6)},
-        8: {'M': (14.9, 18.4), 'F': (14.7, 18.1)},
-        9: {'M': (15.1, 18.9), 'F': (14.9, 18.7)},
-        10: {'M': (15.4, 19.5), 'F': (15.2, 19.4)},
-        11: {'M': (15.8, 20.2), 'F': (15.6, 20.2)},
-        12: {'M': (16.2, 21.0), 'F': (16.1, 21.1)},
-        13: {'M': (16.7, 21.8), 'F': (16.7, 22.0)},
-        14: {'M': (17.3, 22.6), 'F': (17.3, 22.8)},
-        15: {'M': (17.9, 23.3), 'F': (17.8, 23.4)},
-        16: {'M': (18.4, 23.9), 'F': (18.2, 23.8)},
-        17: {'M': (18.8, 24.3), 'F': (18.5, 24.0)},
-    }
-    
-    def _avaliar(self, aluno: Aluno):
-        """Avalia o IMC do aluno"""
-        if not aluno.imc or aluno.idade not in self.TABELA_IMC:
-            aluno.detalhes_imc = {
-                'status': 'incompleto',
-                'mensagem': 'Dados insuficientes para avaliação'
-            }
-            return
-        
-        faixa = self.TABELA_IMC[aluno.idade][aluno.sexo]
-        min_saudavel, max_saudavel = faixa
-        
-        if min_saudavel <= aluno.imc <= max_saudavel:
-            status = 'saudavel'
-            mensagem = 'IMC dentro da zona saudável'
-        else:
-            status = 'risco'
-            if aluno.imc < min_saudavel:
-                mensagem = 'IMC abaixo da zona saudável (baixo peso)'
-            else:
-                mensagem = 'IMC acima da zona saudável (sobrepeso/obesidade)'
-        
-        aluno.detalhes_imc = {
-            'status': status,
-            'valor': round(aluno.imc, 1),
-            'faixa_ideal': f"{min_saudavel} - {max_saudavel}",
-            'mensagem': mensagem
-        }
-
-
-# ======================================================================================
-# ELO 02 - AVALIAÇÃO DE RESISTÊNCIA CARDIORRESPIRATÓRIA (CORRIDA)
-# ======================================================================================
-
-class Elo02_AvaliacaoCorrida(Elo):
-    """Avalia a resistência cardiorrespiratória através do teste de corrida de 6 minutos"""
-    
-    # Tabelas de referência PROESP-Br - Distância mínima em metros (Zona Saudável)
-    TABELA_CORRIDA = {
-        6: {'M': 900, 'F': 850},
-        7: {'M': 950, 'F': 900},
-        8: {'M': 1000, 'F': 950},
-        9: {'M': 1050, 'F': 1000},
-        10: {'M': 1100, 'F': 1050},
-        11: {'M': 1150, 'F': 1100},
-        12: {'M': 1200, 'F': 1150},
-        13: {'M': 1300, 'F': 1200},
-        14: {'M': 1400, 'F': 1250},
-        15: {'M': 1500, 'F': 1300},
-        16: {'M': 1550, 'F': 1350},
-        17: {'M': 1600, 'F': 1400},
-    }
-    
-    def _avaliar(self, aluno: Aluno):
-        """Avalia o teste de corrida do aluno"""
-        if aluno.distancia_corrida is None or aluno.idade not in self.TABELA_CORRIDA:
-            aluno.detalhes_corrida = {
-                'status': 'incompleto',
-                'mensagem': 'Dados insuficientes para avaliação'
-            }
-            return
-        
-        distancia_minima = self.TABELA_CORRIDA[aluno.idade][aluno.sexo]
-        
-        if aluno.distancia_corrida >= distancia_minima:
-            status = 'saudavel'
-            mensagem = 'Resistência cardiorrespiratória adequada'
-        else:
-            status = 'risco'
-            diferenca = distancia_minima - aluno.distancia_corrida
-            mensagem = f'Abaixo do esperado ({diferenca}m de diferença)'
-        
-        aluno.detalhes_corrida = {
-            'status': status,
-            'valor': aluno.distancia_corrida,
-            'minimo_ideal': distancia_minima,
-            'mensagem': mensagem
-        }
-
-
-# ======================================================================================
-# ELO 03 - AVALIAÇÃO DE FLEXIBILIDADE (SENTAR E ALCANÇAR)
-# ======================================================================================
-
-class Elo03_AvaliacaoFlexibilidade(Elo):
-    """Avalia a flexibilidade através do teste de sentar e alcançar"""
-    
-    # Tabelas PROESP-Br - Valor mínimo em centímetros (Zona Saudável)
-    TABELA_FLEXIBILIDADE = {
-        6: {'M': 20, 'F': 22},
-        7: {'M': 21, 'F': 23},
-        8: {'M': 22, 'F': 24},
-        9: {'M': 23, 'F': 25},
-        10: {'M': 24, 'F': 26},
-        11: {'M': 25, 'F': 27},
-        12: {'M': 26, 'F': 28},
-        13: {'M': 27, 'F': 29},
-        14: {'M': 28, 'F': 30},
-        15: {'M': 29, 'F': 31},
-        16: {'M': 30, 'F': 32},
-        17: {'M': 31, 'F': 33},
-    }
-    
-    def _avaliar(self, aluno: Aluno):
-        """Avalia a flexibilidade do aluno"""
-        if aluno.sentar_alcancar is None or aluno.idade not in self.TABELA_FLEXIBILIDADE:
-            aluno.detalhes_flexibilidade = {
-                'status': 'incompleto',
-                'mensagem': 'Dados insuficientes para avaliação'
-            }
-            return
-        
-        minimo = self.TABELA_FLEXIBILIDADE[aluno.idade][aluno.sexo]
-        
-        if aluno.sentar_alcancar >= minimo:
-            status = 'saudavel'
-            mensagem = 'Flexibilidade adequada'
-        else:
-            status = 'risco'
-            diferenca = minimo - aluno.sentar_alcancar
-            mensagem = f'Flexibilidade abaixo do ideal ({diferenca:.1f}cm de diferença)'
-        
-        aluno.detalhes_flexibilidade = {
-            'status': status,
-            'valor': aluno.sentar_alcancar,
-            'minimo_ideal': minimo,
-            'mensagem': mensagem
-        }
-
-
-# ======================================================================================
-# ELO 04 - AVALIAÇÃO DE FORÇA ABDOMINAL
-# ======================================================================================
-
-class Elo04_AvaliacaoAbdominais(Elo):
-    """Avalia a força/resistência abdominal através do teste de abdominais em 1 minuto"""
-    
-    # Tabelas PROESP-Br - Número mínimo de repetições (Zona Saudável)
-    TABELA_ABDOMINAIS = {
-        6: {'M': 20, 'F': 18},
-        7: {'M': 22, 'F': 20},
-        8: {'M': 24, 'F': 22},
-        9: {'M': 26, 'F': 24},
-        10: {'M': 28, 'F': 26},
-        11: {'M': 30, 'F': 28},
-        12: {'M': 32, 'F': 30},
-        13: {'M': 35, 'F': 32},
-        14: {'M': 38, 'F': 34},
-        15: {'M': 40, 'F': 36},
-        16: {'M': 42, 'F': 38},
-        17: {'M': 44, 'F': 40},
-    }
-    
-    def _avaliar(self, aluno: Aluno):
-        """Avalia a força abdominal do aluno"""
-        if aluno.abdominais is None or aluno.idade not in self.TABELA_ABDOMINAIS:
-            aluno.detalhes_abdominais = {
-                'status': 'incompleto',
-                'mensagem': 'Dados insuficientes para avaliação'
-            }
-            return
-        
-        minimo = self.TABELA_ABDOMINAIS[aluno.idade][aluno.sexo]
-        
-        if aluno.abdominais >= minimo:
-            status = 'saudavel'
-            mensagem = 'Força abdominal adequada'
-        else:
-            status = 'risco'
-            diferenca = minimo - aluno.abdominais
-            mensagem = f'Abaixo do esperado ({diferenca} repetições de diferença)'
-        
-        aluno.detalhes_abdominais = {
-            'status': status,
-            'valor': aluno.abdominais,
-            'minimo_ideal': minimo,
-            'mensagem': mensagem
-        }
-
-
-# ======================================================================================
-# ELO 05 - CONSOLIDAÇÃO DOS RESULTADOS
-# ======================================================================================
-
-class Elo05_Consolidacao(Elo):
-    """Consolida todos os resultados e define o status geral do aluno"""
-    
-    def _avaliar(self, aluno: Aluno):
-        """Consolida os resultados das avaliações cardiovascular e musculoesquelética"""
-        
-        # Avaliação Cardiovascular (IMC + Corrida)
-        imc_ok = aluno.detalhes_imc.get('status') == 'saudavel'
-        corrida_ok = aluno.detalhes_corrida.get('status') == 'saudavel'
-        
-        if imc_ok and corrida_ok:
-            aluno.status_cardiovascular = 'saudavel'
-        else:
-            aluno.status_cardiovascular = 'risco'
-        
-        # Avaliação Musculoesquelética (Flexibilidade + Abdominais)
-        flex_ok = aluno.detalhes_flexibilidade.get('status') == 'saudavel'
-        abd_ok = aluno.detalhes_abdominais.get('status') == 'saudavel'
-        
-        if flex_ok and abd_ok:
-            aluno.status_musculoesqueletico = 'saudavel'
-        else:
-            aluno.status_musculoesqueletico = 'risco'
 
 
 # ======================================================================================
@@ -519,9 +270,15 @@ class Model:
     
     def adicionar_aluno(self, nome: str, idade: int, sexo: str) -> Aluno:
         """Adiciona um novo aluno ao sistema"""
-        aluno = Aluno(nome, idade, sexo)
-        self.alunos.append(aluno)
-        return aluno
+        documento = {
+            "nome": nome,
+            "idade": idade,
+            "sexo": sexo
+        }
+        resultado = collection.insert_one(documento)
+        # retorna o registro completo com _id incluso
+        documento["_id"] = resultado.inserted_id
+        return documento
     
     def processar_aluno(self, aluno: Aluno) -> Aluno:
         """Processa um aluno através da cadeia de responsabilidade"""

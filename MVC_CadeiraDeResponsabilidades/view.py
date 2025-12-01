@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-
+import controller 
 
 class View:
 
@@ -116,13 +116,16 @@ class View:
         info.pack(pady=15)
 
         tk.Label(info, text="ALUNO", font=("Arial", 10, "bold"), bg="#e6e6e6").grid(row=0, column=0)
-        tk.Entry(info, width=25).grid(row=1, column=0, padx=10)
+        self.entry_nome = tk.Entry(info, width=25)
+        self.entry_nome.grid(row=1, column=0, padx=10)
 
         tk.Label(info, text="IDADE", font=("Arial", 10, "bold"), bg="#e6e6e6").grid(row=0, column=1)
-        tk.Entry(info, width=10).grid(row=1, column=1, padx=10)
+        self.entry_idade = tk.Entry(info, width=10)
+        self.entry_idade.grid(row=1, column=1, padx=10)
 
         tk.Label(info, text="SEXO", font=("Arial", 10, "bold"), bg="#e6e6e6").grid(row=0, column=2)
-        ttk.Combobox(info, values=["Masculino", "Feminino"], width=12).grid(row=1, column=2, padx=10)
+        self.sexo = ttk.Combobox(info, values=["Masculino", "Feminino"], width=12)
+        self.sexo.grid(row=1, column=2, padx=10)
 
         cols = tk.Frame(self.cardio, bg="#e6e6e6")
         cols.pack(pady=20)
@@ -133,10 +136,12 @@ class View:
         tk.Label(left, text="IMC", font=("Arial", 14, "bold"), bg="#e6e6e6").pack()
 
         tk.Label(left, text="PESO", font=("Arial", 10, "bold"), bg="#e6e6e6").pack(anchor="w")
-        tk.Entry(left, width=20).pack(pady=5)
+        self.entry_peso = tk.Entry(left, width=20)
+        self.entry_peso.pack(pady=5)
 
         tk.Label(left, text="ALTURA", font=("Arial", 10, "bold"), bg="#e6e6e6").pack(anchor="w")
-        tk.Entry(left, width=20).pack(pady=5)
+        self.entry_altura = tk.Entry(left, width=20)
+        self.entry_altura.pack(pady=5)
 
         right = tk.Frame(cols, bg="#e6e6e6")
         right.grid(row=0, column=1, padx=40)
@@ -151,12 +156,15 @@ class View:
         ).pack()
 
         tk.Label(right, text="METROS", font=("Arial", 10, "bold"), bg="#e6e6e6").pack(anchor="w")
-        tk.Entry(right, width=20).pack(pady=5)
+        self.entry_metros = tk.Entry(right, width=20)
+        self.entry_metros.pack(pady=5)
+        
 
         tk.Button(
             self.cardio, text="SALVAR DADOS",
             bg="#1565C0", fg="white", font=("Arial", 12, "bold"),
-            width=15
+            width=15,
+            command= lambda: controller.Controller.salvar_dados_cardiovasculares(self, self.entry_nome.get(), self.entry_idade.get(), self.sexo.get(), self.entry_peso.get(), self.entry_altura.get(), self.entry_metros.get())
         ).pack(pady=20)
 
     # ======================================================================================

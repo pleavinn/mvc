@@ -1,36 +1,28 @@
 from abc import ABC, abstractmethod
+from typing import Dict, List, Optional
+from model import Aluno
 
-class Elo:
-    def __init__(self, model):
-        self.next = None
-
-    def set_next(self, next):
-        self.next = next
-
-    # Realiza o processamento do dado
-    # Necessário retornar o dado para
-    # que quem chamou o primeiro elo
-    # consiga obter o resultado do
-    # processamento
-    #
-    # Este metodo será sobrescrito para
-    # cada novo elo que herdar desta
-    # classe
-    #
-    # Este metodo é abstrato para forçar
-    # a sua implementação nos filhos
+class Elo(ABC):
+    """Classe abstrata base para os elos da cadeia de responsabilidade"""
+    
+    def __init__(self):
+        self._proximo_elo: Optional['Elo'] = None
+    
+    def definir_proximo(self, elo: 'Elo') -> 'Elo':
+        """Define o próximo elo na cadeia"""
+        self._proximo_elo = elo
+        return elo
+    
+    def processar(self, aluno: Aluno) -> Aluno:
+        """Processa o aluno e passa para o próximo elo"""
+        self._avaliar(aluno)
+        
+        if self._proximo_elo:
+            return self._proximo_elo.processar(aluno)
+        
+        return aluno
+    
     @abstractmethod
-    def proc(self, data):
+    def _avaliar(self, aluno: Aluno):
+        """Método abstrato que cada elo deve implementar"""
         pass
-
-    # Roda o elo passando o dado para o próximo
-    # elo e assim sucessivamente até que todos
-    # os elos processem os dados e então retornem
-    # o valor final para quem chamou o start
-    def run(self, data):
-        data = self.proc(data)
-
-        if self.next is not None:
-            return self.next.run(data)
-        else:
-            return data
